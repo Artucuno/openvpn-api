@@ -21,7 +21,7 @@ class VPNType(str, Enum):
 
 
 class VPN:
-    def __init__(self, host: str = None, port: int = None, unix_socket: str = None):
+    def __init__(self, host: str = None, port: int = None, password: str = None, unix_socket: str = None):
         if (unix_socket and host) or (unix_socket and port) or (not unix_socket and not host and not port):
             raise errors.VPNError("Must specify either socket or host and port")
 
@@ -29,7 +29,7 @@ class VPN:
         self._mgmt_host: Optional[str] = host
         self._mgmt_port: Optional[int] = port
         self._socket: Optional[socket.socket] = None
-
+        self._password = password
         # Release info cache
         self._release: Optional[str] = None
 
@@ -67,6 +67,18 @@ class VPN:
                 raise ValueError("Invalid connection type")
 
             resp = self._socket_recv()
+            print(resp)
+            if self._password != None:
+                if resp.startswith("ENTER PASSWORD:"):
+                    self._socket_send(self._password+'\n')
+                    resp = self._socket_recv()
+                    print(resp)
+                    if resp.startswith("ENTER PASSWORD:"):
+                        raise errors.ConnectError('Incorrect Password')
+                    if resp.startswith("SUCCESS:"):
+                        return True
+                    else:
+                        raise errors.ConnectError('Login did not return success', resp)
             assert resp.startswith(">INFO"), "Did not get expected response from interface when opening socket."
             return True
         except (socket.timeout, socket.error) as e:
